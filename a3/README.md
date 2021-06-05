@@ -1,4 +1,4 @@
-## README
+## B Plus Tree
 - The assignment is built using `python3`
 - Run program using this command:
   
