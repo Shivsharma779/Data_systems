@@ -1,0 +1,98 @@
+#!/bin/python3
+import sys
+import heapq
+from math import floor,ceil
+from operator import itemgetter
+from subprocess import getoutput
+from time import time
+metadata_file_path = "./metadata.txt"
+temp_file_format="./.sublist"
+delimiter_char=" "
+no_of_delimiter = 2
+
+""" 
+Command format: ./create_sorted_files input.txt output.txt 50 asc C1 C2
+size of memory is in B
+Work Flow:
+1. Get column info from the metadata file
+2. Find size of each touple
+3. Find chunk size
+4. Split and create_sorted_files
+5. Merge
+
+ """
+
+
+def get_data(input_file,no_of_rows):
+    # global no_of_delimiter
+    table=[]
+    
+    
+    current_row = 0
+    while no_of_rows != current_row :
+        line = input_file.readline()
+        if(line == ""): break
+        
+        table_row = line.split()
+        table.append(table_row)
+        current_row+=1
+         
+    return table
+
+
+
+
+def create_sorted_files(input_file,nr_in_mem,order):
+    with open(input_file,"r") as inf:
+        
+        start_row = 0
+        
+        chunk_no = 0
+        table = get_data(inf, nr_in_mem)
+        while table != []:
+            # print("Processing sublist no",chunk_no+1)
+            # print("Sorting sublist no",chunk_no+1)
+            
+            table = sorted(table,key=lambda x: x[order-1])
+
+            # print("Writing sublist no",chunk_no+1)
+            with open(temp_file_format+str(chunk_no)+".txt","w") as f:
+                for row in table:
+                    write_row = ""
+                    for col in row:
+                        write_row+=(col+" ")
+                    f.write(write_row[:len(write_row)-1]+"\n") 
+            chunk_no+=1
+            start_row=start_row+ nr_in_mem
+            table = get_data(inf, nr_in_mem)
+        
+        return chunk_no
+
+
+if __name__ == "__main__":
+    # p = Process()
+    try:
+        if len(sys.argv) < 5:
+            print("Wrong arguments")
+            sys.exit(0)
+        input_file = sys.argv[1]
+        output_file = sys.argv[2]   
+        nr_in_mem = int(sys.argv[3]) # in terms of records
+        order= int(sys.argv[4])
+        # global temp_file_format
+        temp_file_format += sys.argv[5]
+        
+        
+        start = time() 
+        no_of_chunks = create_sorted_files(input_file, nr_in_mem, order)
+        # merge_files(no_of_chunks,output_file,order,nr_in_mem)
+        end=time()
+        print(no_of_chunks)
+        
+        
+        # getoutput("rm -rf "+temp_file_format+"*")
+        
+    except  Exception as E :
+        print(E)
+        print("wrong query")
+    # print(p.num_threads())

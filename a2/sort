@@ -1,0 +1,224 @@
+#!/bin/python3
+import sys
+import heapq
+from math import floor,ceil
+from operator import itemgetter
+from psutil import Process
+from subprocess import getoutput
+from time import time
+metadata_file_path = "./metadata.txt"
+temp_file_format="./.sublist"
+delimiter_char=" "
+no_of_delimiter = 2
+
+""" 
+Command format: ./create_sorted_files input.txt output.txt 50 asc C1 C2
+size of memory is in B
+Work Flow:
+1. Get column info from the metadata file
+2. Find size of each touple
+3. Find chunk size
+4. Split and create_sorted_files
+5. Merge
+
+ """
+
+class row(object):
+    order_columns=[]
+    order=""
+    def __init__(self,data,chunk_no,file_pointer):
+        self.data = data
+        self.chunk_no = chunk_no
+        self.file_pointer = file_pointer
+    def get_row(self):
+        return self.data
+    def get_file_pointer(self):
+        return self.file_pointer
+    def get_chunk_no(self):
+        return self.chunk_no
+    def __lt__(self,other):
+        if order == "desc":
+            for col in row.order_columns:
+                if (self.data[col] < other.data[col]): return False
+                elif (self.data[col] > other.data[col]): return True
+            return True
+        else:
+            for col in row.order_columns:
+                if (self.data[col] < other.data[col]): return True
+                elif (self.data[col] > other.data[col]): return False
+            return True
+
+def get_column_info():
+    global metadata_file_path
+    cols = []
+    col_size = []
+    with open(metadata_file_path,"r") as f:
+        lines = f.readlines()
+    for line in lines:
+        if line[len(line)-1] == "\n": line = line[:len(line)-1]
+        col_name = line.split(",")[0]
+        size = line.split(",")[1]
+        cols+=[col_name]
+        col_size+=[int(size)]
+    return cols,col_size
+
+def get_data(input_file,no_of_rows, column_size):
+    # global no_of_delimiter
+    table=[]
+    
+    
+    current_row = 0
+    while no_of_rows != current_row :
+        line = input_file.readline()
+        if(line == ""): break
+        i=0
+        table_row = []
+        
+        for col in column_size:
+            table_row+=[line[i:i+col]]
+            i=i+col+no_of_delimiter
+        table.append(table_row)
+    
+        current_row+=1
+         
+    return table
+
+
+
+
+def preprocess(input_file, memory_limit,order,order_columns):
+    columns , column_size = get_column_info()
+    
+    memory_limit = memory_limit.upper()
+    
+    if "M" in memory_limit: memory_limit = int(memory_limit.split("M")[0])*1024*1024
+    elif "G" in memory_limit: memory_limit = int(memory_limit.split("G")[0])*1024*1024*1024
+    elif "K" in memory_limit: memory_limit = int(memory_limit.split("K")[0])*1024
+    else: memory_limit = int(memory_limit)
+    
+    size_of_tuple = 0
+    for size in column_size: size_of_tuple+=size+no_of_delimiter
+    # size_of_tuple-=1
+    
+    # memory_limit = memory_limit / no of thread
+
+    nr_in_chunk = floor(memory_limit/size_of_tuple)
+    
+    order_index = []
+    for col in order_columns:
+        order_index+=[columns.index(col)]
+    
+    return nr_in_chunk,column_size,order_index,size_of_tuple,memory_limit
+
+def create_sorted_files(input_file,nr_in_chunk,column_size,order,order_columns):
+    with open(input_file,"r") as inf:
+        
+        start_row = 0
+        chunk_no = 0
+        
+        delimiter = ""
+        for _ in range(no_of_delimiter): delimiter+=delimiter_char
+        
+        chunk_no = 0
+        table = get_data(inf, nr_in_chunk,column_size)
+        while table != []:
+            # print("Processing sublist no",chunk_no+1)
+            print("Sorting sublist no",chunk_no+1)
+            if order == "desc": table = sorted(table,key=itemgetter(*order_columns),reverse=True)
+            else: table = sorted(table,key=itemgetter(*order_columns))
+
+            print("Writing sublist no",chunk_no+1)
+            with open(temp_file_format+str(chunk_no)+".txt","w") as f:
+                for row in table:
+                    write_row = ""
+                    for col in row:
+                        write_row+=(col+delimiter)
+                    f.write(write_row[:len(write_row)-2]+"\n") 
+            chunk_no+=1
+            start_row=start_row+ nr_in_chunk
+            table = get_data(inf, nr_in_chunk,column_size)
+        
+        return chunk_no
+
+
+def merge_files(no_of_chunks,output_file,column_size,order,order_columns,nr_in_chunk):
+    print("Merging:")
+    delimiter = ""
+    for _ in range(no_of_delimiter): delimiter+=delimiter_char
+    
+    pq = []
+    # row_no=[0]*no_of_chunks
+    row.order_columns=order_columns
+    row.order=order
+    for chunk_no in range(no_of_chunks):
+        filename = temp_file_format+str(chunk_no)+".txt"
+        tempfile = open(filename,"r")
+        row_data = get_data(tempfile,1,columns_size)[0]
+        pq.append(row(row_data,chunk_no,tempfile))
+    heapq.heapify(pq)
+
+
+    f=open(output_file,"w")
+    
+    
+    chunks_processed = 0
+    
+    while chunks_processed < no_of_chunks:
+        element = heapq.heappop(pq)
+        data_row = element.get_row()
+        chunk_no = element.get_chunk_no()
+        file_pointer = element.get_file_pointer()
+        
+        write_row=""
+        for col in data_row:
+            write_row+=(col+delimiter)
+        f.write(write_row[:len(write_row)-2]+"\r\n")
+        
+        next_data = get_data(file_pointer,1,columns_size)
+        
+
+        if next_data == []: 
+            chunks_processed+=1
+            file_pointer.close()
+            print("No of sublist processed",chunks_processed)
+        else: heapq.heappush(pq,row(next_data[0],chunk_no,file_pointer))
+
+    f.close()
+
+if __name__ == "__main__":
+    # p = Process()
+    try:
+        if len(sys.argv) < 5:
+            print("Wrong arguments")
+            sys.exit(0)
+        input_file = sys.argv[1]
+        output_file = sys.argv[2]
+        memory_limit = sys.argv[3]
+        x= memory_limit
+        order= sys.argv[4]
+        columns= sys.argv[5:]
+        
+        nr_in_chunk,columns_size,order_index,size_of_tuple,memory_limit = preprocess(input_file,memory_limit,order,columns)
+        
+        start = time() 
+        no_of_chunks = create_sorted_files(input_file, nr_in_chunk, columns_size, order, order_index)
+        if no_of_chunks * size_of_tuple > memory_limit:
+            print("Not possible")
+            exit(1)
+        merge_files(no_of_chunks,output_file,columns_size,order,order_index,nr_in_chunk)
+        end=time()
+        
+        
+        print("Program ran for ", end-start,"s")
+        a= getoutput("ls -lh "+temp_file_format+"0.txt").split()[4]
+        b= getoutput("ls -lh "+input_file).split()[4]
+        
+        print("size of a sublist",a)
+        # getoutput("rm -rf "+temp_file_format+"*")
+        with open("observation_mem.txt","a") as f:
+            write_row = str(x)+  " "+ str(end-start) + " " + b +"\n"
+            f.write(write_row)
+    except  Exception as E :
+        print(E)
+        print("wrong query")
+    # print(p.num_threads())
