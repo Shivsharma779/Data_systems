@@ -1,4 +1,4 @@
-# Data_systems
+# Data Systems
 Repository for data system assignments taken by PK Reddy
 - A1: SQL Engine
 - A2: Two Phase Merge
