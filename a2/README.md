@@ -1,4 +1,4 @@
-### Readme:
+### Two Phase Merge Sort:
 - The zip containes two files for execution of program with threading and without threading
 - Both the programs are built with python3
 - The name of program without sorting is `sort` and with sorting `sort with thread`
